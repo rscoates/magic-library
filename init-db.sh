@@ -5,11 +5,11 @@ set -e
 if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
     echo "Initializing PostgreSQL database..."
     chown -R postgres:postgres /var/lib/postgresql/data
-    su postgres -c "/usr/lib/postgresql/15/bin/initdb -D /var/lib/postgresql/data"
+    su postgres -c "initdb -D /var/lib/postgresql/data"
 fi
 
 # Start PostgreSQL temporarily for migrations
-su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data -l /var/log/postgresql.log start"
+su postgres -c "pg_ctl -D /var/lib/postgresql/data -l /var/log/postgresql.log start"
 
 # Wait for PostgreSQL to be ready
 until su postgres -c "pg_isready" > /dev/null 2>&1; do
@@ -25,7 +25,7 @@ cd /app
 alembic upgrade head
 
 # Stop PostgreSQL (supervisord will start it properly)
-su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data stop"
+su postgres -c "pg_ctl -D /var/lib/postgresql/data stop"
 
 echo "Database initialization complete."
 

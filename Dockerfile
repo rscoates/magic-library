@@ -20,7 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     postgresql \
     postgresql-contrib \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/lib/postgresql/*/bin/* /usr/local/bin/
 
 # Install Python dependencies
 COPY backend/requirements.txt .
