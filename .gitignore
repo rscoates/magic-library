@@ -1,0 +1,50 @@
+# Environment
+node_modules/
+dist/
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.eggs/
+*.egg
+.mypy_cache/
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Docker
+postgres_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+htmlcov/
+.coverage
+
+# Build artifacts
+build/
+
+# All Printings
+backend/data/AllPrintings.json
+AllPrintings.json
