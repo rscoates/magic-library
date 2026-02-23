@@ -44,7 +44,8 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copy database init script
 COPY init-db.sh /init-db.sh
-RUN chmod +x /init-db.sh
+RUN chmod +x /init-db.sh && \
+    sed -i 's/\r$//' /init-db.sh
 
 # Environment defaults
 ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/magic_library

@@ -48,3 +48,6 @@ build/
 # All Printings
 backend/data/AllPrintings.json
 AllPrintings.json
+
+#CasaOS
+casaos-docker-compose.yml

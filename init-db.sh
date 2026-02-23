@@ -1,42 +1,33 @@
 #!/bin/bash
 set -e
 
-# Initialize PostgreSQL if data directory is empty
-if [ -z "$(ls -A /var/lib/postgresql/data 2>/dev/null)" ]; then
+# Initialize PostgreSQL data directory if empty
+if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
     echo "Initializing PostgreSQL database..."
-    
-    # Initialize database cluster
+    chown -R postgres:postgres /var/lib/postgresql/data
     su postgres -c "/usr/lib/postgresql/15/bin/initdb -D /var/lib/postgresql/data"
-    
-    # Configure PostgreSQL to accept local connections
-    echo "host all all 127.0.0.1/32 trust" >> /var/lib/postgresql/data/pg_hba.conf
-    echo "local all all trust" >> /var/lib/postgresql/data/pg_hba.conf
-    
-    # Start PostgreSQL temporarily to create database
-    su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data -w start"
-    
-    # Create database and user
-    su postgres -c "psql -c \"CREATE DATABASE magic_library;\""
-    
-    # Run alembic migrations
-    cd /app
-    alembic upgrade head
-    
-    # Stop PostgreSQL (supervisor will start it properly)
-    su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data -w stop"
-    
-    echo "Database initialization complete."
-else
-    echo "Database already initialized, running migrations..."
-    
-    # Start PostgreSQL temporarily to run migrations
-    su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data -w start"
-    
-    cd /app
-    alembic upgrade head
-    
-    su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data -w stop"
 fi
 
-# Start supervisor (which will start all services)
+# Start PostgreSQL temporarily for migrations
+su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data -l /var/log/postgresql.log start"
+
+# Wait for PostgreSQL to be ready
+until su postgres -c "pg_isready" > /dev/null 2>&1; do
+    echo "Waiting for PostgreSQL..."
+    sleep 1
+done
+
+# Create database if it doesn't exist
+su postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname = 'magic_library'\" | grep -q 1 || psql -c \"CREATE DATABASE magic_library\""
+
+# Run Alembic migrations
+cd /app
+alembic upgrade head
+
+# Stop PostgreSQL (supervisord will start it properly)
+su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data stop"
+
+echo "Database initialization complete."
+
+# Start supervisord
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
