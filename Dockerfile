@@ -32,7 +32,9 @@ COPY backend/ .
 
 # Create directories
 RUN mkdir -p /app/data /var/lib/postgresql/data /run/postgresql /var/log/supervisor \
-    && chown -R postgres:postgres /var/lib/postgresql /run/postgresql
+    && chown -R postgres:postgres /var/lib/postgresql /run/postgresql \
+    && touch /var/log/postgresql.log \
+    && chown postgres:postgres /var/log/postgresql.log
 
 # Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
