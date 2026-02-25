@@ -16,7 +16,7 @@ class ContainerCreate(BaseModel):
     description: Optional[str] = None
     type_id: int
     parent_id: Optional[int] = None
-    binder_columns: Literal[3, 4] = 3
+    binder_columns: Literal[2, 3, 4] = 3
     binder_fill_row: bool = False
     
     @field_validator("name")
@@ -32,7 +32,7 @@ class ContainerUpdate(BaseModel):
     description: Optional[str] = None
     type_id: Optional[int] = None
     parent_id: Optional[int] = None
-    binder_columns: Optional[Literal[3, 4]] = None
+    binder_columns: Optional[Literal[2, 3, 4]] = None
     binder_fill_row: Optional[bool] = None
 
 

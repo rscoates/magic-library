@@ -26,7 +26,7 @@ class Container(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Binder view settings (only used for 'file' type containers)
-    binder_columns = Column(Integer, nullable=False, default=3)  # 3 or 4
+    binder_columns = Column(Integer, nullable=False, default=3)  # 2, 3, or 4
     binder_fill_row = Column(Boolean, nullable=False, default=False)  # Fill row with copies vs badge
     
     container_type = relationship("ContainerType", back_populates="containers")
@@ -35,5 +35,5 @@ class Container(Base):
     
     __table_args__ = (
         CheckConstraint("depth <= 10", name="max_depth_check"),
-        CheckConstraint("binder_columns IN (3, 4)", name="binder_columns_check"),
+        CheckConstraint("binder_columns IN (2, 3, 4)", name="binder_columns_check"),
     )

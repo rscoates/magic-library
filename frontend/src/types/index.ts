@@ -22,7 +22,7 @@ export interface Container {
   parent_id: number | null;
   depth: number;
   created_at: string;
-  binder_columns: 3 | 4;
+  binder_columns: 2 | 3 | 4;
   binder_fill_row: boolean;
   children: Container[];
 }
@@ -32,7 +32,7 @@ export interface ContainerCreate {
   description?: string;
   type_id: number;
   parent_id?: number;
-  binder_columns?: 3 | 4;
+  binder_columns?: 2 | 3 | 4;
   binder_fill_row?: boolean;
 }
 
@@ -169,7 +169,7 @@ export interface BinderPage {
   total_pages: number;
   slots: BinderSlot[];
   max_position: number;
-  binder_columns: 3 | 4;
+  binder_columns: 2 | 3 | 4;
   binder_fill_row: boolean;
 }
 

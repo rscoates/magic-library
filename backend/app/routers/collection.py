@@ -479,7 +479,7 @@ def get_binder_page(
     
     # Get binder settings from container
     columns = container.binder_columns or 3
-    rows = 3  # Always 3 rows
+    rows = 2 if columns == 2 else 3  # 2x2 layout or 3 rows
     fill_row_mode = container.binder_fill_row or False
     slots_per_page = columns * rows
     

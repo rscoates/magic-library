@@ -80,7 +80,7 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
 
   // Settings state
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsColumns, setSettingsColumns] = useState<3 | 4>(3);
+  const [settingsColumns, setSettingsColumns] = useState<2 | 3 | 4>(3);
   const [settingsFillRow, setSettingsFillRow] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
 
@@ -93,7 +93,7 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
       setPage(pageNum);
       setImageErrors(new Set());
       // Sync settings from response
-      setSettingsColumns(data.binder_columns as 3 | 4);
+      setSettingsColumns(data.binder_columns as 2 | 3 | 4);
       setSettingsFillRow(data.binder_fill_row);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -353,14 +353,14 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
           sx={{
             display: 'grid',
             gridTemplateColumns: `repeat(${binderPage?.binder_columns || 3}, 1fr)`,
-            gridTemplateRows: 'repeat(3, 1fr)',
+            gridTemplateRows: `repeat(${binderPage?.binder_columns === 2 ? 2 : 3}, 1fr)`,
             gap: 1.5,
             height: '100%',
-            maxWidth: binderPage?.binder_columns === 4 ? 750 : 600,
+            maxWidth: binderPage?.binder_columns === 4 ? 750 : binderPage?.binder_columns === 2 ? 450 : 600,
             mx: 'auto',
           }}
         >
-          {binderPage?.slots.map((slot, index) => renderSlot(slot, index)) || Array((binderPage?.binder_columns || 3) * 3).fill(null).map((_, i) => (
+          {binderPage?.slots.map((slot, index) => renderSlot(slot, index)) || Array((binderPage?.binder_columns || 3) * (binderPage?.binder_columns === 2 ? 2 : 3)).fill(null).map((_, i) => (
             <Skeleton key={i} variant="rectangular" sx={{ aspectRatio: '63/88', borderRadius: 1 }} />
           ))}
         </Box>
@@ -505,8 +505,9 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
               <Select
                 value={settingsColumns}
                 label="Columns per row"
-                onChange={(e) => setSettingsColumns(e.target.value as 3 | 4)}
+                onChange={(e) => setSettingsColumns(e.target.value as 2 | 3 | 4)}
               >
+                <MenuItem value={2}>2 columns (2×2 = 4 slots/page)</MenuItem>
                 <MenuItem value={3}>3 columns (3×3 = 9 slots/page)</MenuItem>
                 <MenuItem value={4}>4 columns (4×3 = 12 slots/page)</MenuItem>
               </Select>
