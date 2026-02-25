@@ -174,4 +174,9 @@ export const binderApi = {
     const { data } = await api.post(`/collection/binder/${containerId}/positions`, { updates });
     return data;
   },
+
+  getEntriesAtPosition: async (containerId: number, position: number): Promise<import('../types').PositionEntriesResponse> => {
+    const { data } = await api.get(`/collection/binder/${containerId}/position/${position}`);
+    return data;
+  },
 };

@@ -177,3 +177,22 @@ export interface PositionUpdate {
   entry_id: number;
   position: number | null;
 }
+
+// Position detail types (for showing all copies at a position)
+export interface PositionEntry {
+  entry_id: number;
+  set_code: string;
+  card_number: string;
+  card_name: string;
+  quantity: number;
+  finish_name: string | null;
+  language_name: string;
+  release_date: string | null;
+}
+
+export interface PositionEntriesResponse {
+  position: number;
+  card_name: string;
+  entries: PositionEntry[];
+  total_quantity: number;
+}

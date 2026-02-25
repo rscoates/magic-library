@@ -20,6 +20,13 @@ import {
   MenuItem,
   FormControlLabel,
   Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
 } from '@mui/material';
 import {
   NavigateBefore as PrevIcon,
@@ -30,7 +37,7 @@ import {
 } from '@mui/icons-material';
 import { binderApi, collectionApi, containersApi } from '../api';
 import { getErrorMessage } from '../api/client';
-import type { BinderPage, BinderSlot } from '../types';
+import type { BinderPage, BinderSlot, PositionEntriesResponse } from '../types';
 
 interface BinderViewProps {
   containerId: number;
@@ -40,8 +47,8 @@ interface BinderViewProps {
 
 // Build Scryfall image URL from set code and collector number
 const getScryfallImageUrl = (setCode: string, cardNumber: string): string => {
-  // Scryfall uses lowercase set codes
-  return `https://api.scryfall.com/cards/${setCode.toLowerCase()}/${cardNumber}?format=image&version=normal`;
+  // Scryfall uses lowercase set codes and collector numbers must be URL-encoded
+  return `https://api.scryfall.com/cards/${encodeURIComponent(setCode.toLowerCase())}/${encodeURIComponent(cardNumber)}?format=image&version=normal`;
 };
 
 // Card back placeholder
@@ -62,6 +69,11 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
   const [selectedSlot, setSelectedSlot] = useState<BinderSlot | null>(null);
   const [editPosition, setEditPosition] = useState<string>('');
   const [editLoading, setEditLoading] = useState(false);
+  
+  // Detail dialog state (shows all copies/editions at a position)
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [positionEntries, setPositionEntries] = useState<PositionEntriesResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   
   // Image loading states
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
@@ -137,19 +149,40 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
     }
   };
 
-  const handleSlotClick = (slot: BinderSlot) => {
+  const handleSlotClick = async (slot: BinderSlot) => {
     setSelectedSlot(slot);
-    setEditPosition(slot.position.toString());
+    setDetailLoading(true);
+    setDetailDialogOpen(true);
+    
+    try {
+      const entries = await binderApi.getEntriesAtPosition(containerId, slot.position);
+      setPositionEntries(entries);
+      setEditPosition(slot.position.toString());
+    } catch (err) {
+      setError(getErrorMessage(err));
+      setDetailDialogOpen(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleOpenEditDialog = () => {
+    setDetailDialogOpen(false);
     setEditDialogOpen(true);
   };
 
   const handlePositionUpdate = async () => {
-    if (!selectedSlot || !selectedSlot.entry_id) return;
+    if (!selectedSlot || !positionEntries) return;
     
     setEditLoading(true);
     try {
       const newPosition = editPosition.trim() ? parseInt(editPosition) : null;
-      await collectionApi.update(selectedSlot.entry_id, { position: newPosition ?? undefined });
+      // Update position for all entries at this position
+      const updates = positionEntries.entries.map(entry => ({
+        entry_id: entry.entry_id,
+        position: newPosition,
+      }));
+      await binderApi.updatePositions(containerId, updates);
       setEditDialogOpen(false);
       loadPage(page);
     } catch (err) {
@@ -163,7 +196,7 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
     setImageErrors((prev) => new Set(prev).add(position));
   };
 
-  const renderSlot = (slot: BinderSlot) => {
+  const renderSlot = (slot: BinderSlot, index: number) => {
     const showCardBack = slot.is_empty || imageErrors.has(slot.position);
     const imageUrl = !slot.is_empty && slot.set_code && slot.card_number
       ? getScryfallImageUrl(slot.set_code, slot.card_number)
@@ -171,7 +204,7 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
 
     return (
       <Box
-        key={slot.position}
+        key={slot.entry_id ?? `empty-${index}`}
         sx={{
           position: 'relative',
           aspectRatio: '63/88',
@@ -327,7 +360,7 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
             mx: 'auto',
           }}
         >
-          {binderPage?.slots.map(renderSlot) || Array((binderPage?.binder_columns || 3) * 3).fill(null).map((_, i) => (
+          {binderPage?.slots.map((slot, index) => renderSlot(slot, index)) || Array((binderPage?.binder_columns || 3) * 3).fill(null).map((_, i) => (
             <Skeleton key={i} variant="rectangular" sx={{ aspectRatio: '63/88', borderRadius: 1 }} />
           ))}
         </Box>
@@ -370,15 +403,15 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
       
       {/* Edit dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
-        <DialogTitle>Edit Card Position</DialogTitle>
+        <DialogTitle>Move Card to New Position</DialogTitle>
         <DialogContent>
-          {selectedSlot && (
+          {selectedSlot && positionEntries && (
             <Box sx={{ pt: 1 }}>
               <Typography variant="body2" gutterBottom>
-                Card: <strong>{selectedSlot.card_name}</strong>
+                Card: <strong>{positionEntries.card_name}</strong>
               </Typography>
               <Typography variant="body2" gutterBottom>
-                Set: {selectedSlot.set_code} #{selectedSlot.card_number}
+                {positionEntries.entries.length} edition(s), {positionEntries.total_quantity} total copies
               </Typography>
               <Typography variant="body2" gutterBottom>
                 Current position: {selectedSlot.position}
@@ -390,7 +423,7 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
                 onChange={(e) => setEditPosition(e.target.value)}
                 fullWidth
                 sx={{ mt: 2 }}
-                helperText="Enter slot number (1-based) or leave empty to remove from binder"
+                helperText="All editions of this card will be moved to the new position"
               />
             </Box>
           )}
@@ -403,6 +436,61 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
             disabled={editLoading}
           >
             {editLoading ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Detail dialog - shows all copies/editions at a position */}
+      <Dialog 
+        open={detailDialogOpen} 
+        onClose={() => setDetailDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {positionEntries?.card_name || selectedSlot?.card_name || 'Card Details'}
+          <Typography variant="body2" color="text.secondary">
+            Position {positionEntries?.position || selectedSlot?.position} • {positionEntries?.total_quantity || 0} total copies
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {detailLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : positionEntries && (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Set</TableCell>
+                    <TableCell>Number</TableCell>
+                    <TableCell>Language</TableCell>
+                    <TableCell>Finish</TableCell>
+                    <TableCell>Qty</TableCell>
+                    <TableCell>Release Date</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {positionEntries.entries.map((entry) => (
+                    <TableRow key={entry.entry_id}>
+                      <TableCell>{entry.set_code}</TableCell>
+                      <TableCell>{entry.card_number}</TableCell>
+                      <TableCell>{entry.language_name}</TableCell>
+                      <TableCell>{entry.finish_name || '-'}</TableCell>
+                      <TableCell>{entry.quantity}</TableCell>
+                      <TableCell>{entry.release_date || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailDialogOpen(false)}>Close</Button>
+          <Button onClick={handleOpenEditDialog} variant="outlined">
+            Edit Position
           </Button>
         </DialogActions>
       </Dialog>

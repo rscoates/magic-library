@@ -10,6 +10,7 @@ from app.models.container import Container, ContainerType
 from app.models.card import Card
 from app.models.metadata import Language, Finish
 from app.models.user import User
+from app.models.set import Set
 from app.schemas.collection import (
     CollectionEntryCreate, CollectionEntryUpdate, CollectionEntryResponse,
     CollectionSummary, CollectionLocation, CollectionMoveRequest, CollectionMoveResponse
@@ -69,6 +70,33 @@ def add_to_collection(
         if not finish:
             raise HTTPException(status_code=400, detail="Invalid finish")
     
+    # Check if container is a "file" type (binder) and auto-assign position if not provided
+    position_to_assign = data.position
+    container_type = db.query(ContainerType).filter(ContainerType.id == container.type_id).first()
+    if container_type and container_type.name.lower() == "file" and position_to_assign is None:
+        # Check if there's already an entry with the same card name in this container
+        # Cards with the same name share a position
+        existing_same_name = db.query(CollectionEntry).join(
+            Card, 
+            (Card.set_code == CollectionEntry.set_code) & (Card.number == CollectionEntry.card_number)
+        ).filter(
+            CollectionEntry.container_id == data.container_id,
+            CollectionEntry.user_id == user.id,
+            CollectionEntry.position.isnot(None),
+            Card.name == card.name
+        ).first()
+        
+        if existing_same_name:
+            # Use the same position as existing card with this name
+            position_to_assign = existing_same_name.position
+        else:
+            # Find the next available position
+            max_position = db.query(func.max(CollectionEntry.position)).filter(
+                CollectionEntry.container_id == data.container_id,
+                CollectionEntry.user_id == user.id
+            ).scalar()
+            position_to_assign = (max_position or 0) + 1
+    
     # Check for existing entry with same characteristics
     existing = db.query(CollectionEntry).filter(
         CollectionEntry.set_code == data.set_code.upper(),
@@ -96,7 +124,8 @@ def add_to_collection(
             finish_id=data.finish_id,
             language_id=data.language_id,
             comments=data.comments,
-            user_id=user.id
+            user_id=user.id,
+            position=position_to_assign
         )
         db.add(entry)
         db.commit()
@@ -433,7 +462,12 @@ def get_binder_page(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Get a page of cards for binder view. Only works for 'file' containers."""
+    """Get a page of cards for binder view. Only works for 'file' containers.
+    
+    Cards are grouped by name - multiple entries with the same card name share a position.
+    In normal mode: shows one representative card per position (oldest English printing).
+    In fill mode: shows up to 4 different variants per position.
+    """
     container = db.query(Container).filter(Container.id == container_id).first()
     if not container:
         raise HTTPException(status_code=404, detail="Container not found")
@@ -449,59 +483,135 @@ def get_binder_page(
     fill_row_mode = container.binder_fill_row or False
     slots_per_page = columns * rows
     
-    # Calculate position range for this page
-    start_position = (page - 1) * slots_per_page + 1
-    end_position = start_position + slots_per_page - 1
+    # Get English language ID for prioritization
+    english_lang = db.query(Language).filter(func.lower(Language.name) == 'english').first()
+    english_lang_id = english_lang.id if english_lang else None
     
-    # Get entries in this container with positions
-    entries = db.query(CollectionEntry).filter(
-        CollectionEntry.container_id == container_id,
-        CollectionEntry.user_id == user.id,
-        CollectionEntry.position.isnot(None),
-        CollectionEntry.position >= start_position,
-        CollectionEntry.position <= end_position
-    ).all()
-    
-    # Build a map of position -> entry
-    position_map = {entry.position: entry for entry in entries}
-    
-    # Get the max position used in this container
-    max_position_entry = db.query(CollectionEntry).filter(
+    # Get all distinct positions in this container
+    distinct_positions = db.query(CollectionEntry.position).filter(
         CollectionEntry.container_id == container_id,
         CollectionEntry.user_id == user.id,
         CollectionEntry.position.isnot(None)
-    ).order_by(CollectionEntry.position.desc()).first()
+    ).distinct().order_by(CollectionEntry.position).all()
+    distinct_positions = [p[0] for p in distinct_positions]
     
-    max_position = max_position_entry.position if max_position_entry else 0
+    max_position = max(distinct_positions) if distinct_positions else 0
     
-    # Calculate total pages (at minimum 1 page, or based on max position)
-    total_pages = max(1, (max_position + slots_per_page - 1) // slots_per_page)
-    
-    # Build slots for this page
-    slots = []
-    for pos in range(start_position, end_position + 1):
-        entry = position_map.get(pos)
-        if entry:
-            card = db.query(Card).filter(
-                Card.set_code == entry.set_code,
-                Card.number == entry.card_number
-            ).first()
-            finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None
-            language = db.query(Language).filter(Language.id == entry.language_id).first()
+    if fill_row_mode:
+        # In fill mode, we need to calculate slots differently
+        # Each position can expand to up to 4 slots
+        # We need to figure out which positions fall on this page
+        
+        # Build expanded slot list for all positions
+        all_expanded_slots = []
+        for pos in distinct_positions:
+            # Get all entries at this position, ordered by priority:
+            # 1. English first, 2. Oldest set release date, 3. Entry ID
+            entries_at_pos = db.query(CollectionEntry).outerjoin(
+                Set, Set.code == CollectionEntry.set_code
+            ).filter(
+                CollectionEntry.container_id == container_id,
+                CollectionEntry.user_id == user.id,
+                CollectionEntry.position == pos
+            ).order_by(
+                # English first
+                (CollectionEntry.language_id != english_lang_id).asc() if english_lang_id else CollectionEntry.id,
+                # Oldest release date
+                func.coalesce(Set.release_date, '9999-12-31'),
+                CollectionEntry.id
+            ).limit(4).all()
             
-            slots.append(BinderSlot(
-                position=pos,
-                entry_id=entry.id,
-                set_code=entry.set_code,
-                card_number=entry.card_number,
-                card_name=card.name if card else "Unknown",
-                quantity=entry.quantity,
-                finish_name=finish.name if finish else None,
-                language_name=language.name if language else "Unknown",
-                is_empty=False
-            ))
-        else:
-            slots.append(BinderSlot(position=pos, is_empty=True))
+            for entry in entries_at_pos:
+                card = db.query(Card).filter(
+                    Card.set_code == entry.set_code,
+                    Card.number == entry.card_number
+                ).first()
+                finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None
+                language = db.query(Language).filter(Language.id == entry.language_id).first()
+                
+                all_expanded_slots.append(BinderSlot(
+                    position=pos,
+                    entry_id=entry.id,
+                    set_code=entry.set_code,
+                    card_number=entry.card_number,
+                    card_name=card.name if card else "Unknown",
+                    quantity=entry.quantity,
+                    finish_name=finish.name if finish else None,
+                    language_name=language.name if language else "Unknown",
+                    is_empty=False
+                ))
+        
+        # Calculate total pages based on expanded slots
+        total_expanded = len(all_expanded_slots)
+        total_pages = max(1, (total_expanded + slots_per_page - 1) // slots_per_page)
+        
+        # Get slots for this page
+        start_idx = (page - 1) * slots_per_page
+        end_idx = start_idx + slots_per_page
+        slots = all_expanded_slots[start_idx:end_idx]
+        
+        # Pad with empty slots if needed
+        while len(slots) < slots_per_page:
+            slots.append(BinderSlot(position=0, is_empty=True))
+    else:
+        # Normal mode: one slot per position, showing oldest English printing
+        # Calculate which positions fall on this page
+        start_position = (page - 1) * slots_per_page + 1
+        end_position = start_position + slots_per_page - 1
+        
+        # Calculate total pages based on max position
+        total_pages = max(1, (max_position + slots_per_page - 1) // slots_per_page)
+        
+        slots = []
+        for pos in range(start_position, end_position + 1):
+            if pos in distinct_positions:
+                # Get the best representative entry for this position:
+                # English first, oldest release date, lowest ID
+                entry = db.query(CollectionEntry).outerjoin(
+                    Set, Set.code == CollectionEntry.set_code
+                ).filter(
+                    CollectionEntry.container_id == container_id,
+                    CollectionEntry.user_id == user.id,
+                    CollectionEntry.position == pos
+                ).order_by(
+                    # English first
+                    (CollectionEntry.language_id != english_lang_id).asc() if english_lang_id else CollectionEntry.id,
+                    # Oldest release date
+                    func.coalesce(Set.release_date, '9999-12-31'),
+                    CollectionEntry.id
+                ).first()
+                
+                if entry:
+                    card = db.query(Card).filter(
+                        Card.set_code == entry.set_code,
+                        Card.number == entry.card_number
+                    ).first()
+                    finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None
+                    language = db.query(Language).filter(Language.id == entry.language_id).first()
+                    
+                    # Count total entries at this position for overflow indicator
+                    total_at_pos = db.query(CollectionEntry).filter(
+                        CollectionEntry.container_id == container_id,
+                        CollectionEntry.user_id == user.id,
+                        CollectionEntry.position == pos
+                    ).count()
+                    
+                    slots.append(BinderSlot(
+                        position=pos,
+                        entry_id=entry.id,
+                        set_code=entry.set_code,
+                        card_number=entry.card_number,
+                        card_name=card.name if card else "Unknown",
+                        quantity=entry.quantity,
+                        finish_name=finish.name if finish else None,
+                        language_name=language.name if language else "Unknown",
+                        is_empty=False,
+                        overflow_count=total_at_pos - 1 if total_at_pos > 1 else None
+                    ))
+                else:
+                    slots.append(BinderSlot(position=pos, is_empty=True))
+            else:
+                slots.append(BinderSlot(position=pos, is_empty=True))
     
     return BinderPageResponse(
         container_id=container_id,
@@ -556,4 +666,96 @@ def update_binder_positions(
     db.commit()
     
     return BulkPositionUpdateResponse(success=True, updated_count=updated)
+
+
+class PositionEntryResponse(BaseModel):
+    """Response for entries at a specific binder position."""
+    entry_id: int
+    set_code: str
+    card_number: str
+    card_name: str
+    quantity: int
+    finish_name: Optional[str] = None
+    language_name: str
+    release_date: Optional[str] = None  # Set release date for display
+
+
+class PositionEntriesResponse(BaseModel):
+    """Response containing all entries at a binder position."""
+    position: int
+    card_name: str
+    entries: List[PositionEntryResponse]
+    total_quantity: int
+
+
+@router.get("/binder/{container_id}/position/{position}", response_model=PositionEntriesResponse)
+def get_entries_at_position(
+    container_id: int,
+    position: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get all entries at a specific binder position. Used for the detail dialog."""
+    container = db.query(Container).filter(Container.id == container_id).first()
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
+    
+    # Get English language ID for prioritization
+    english_lang = db.query(Language).filter(func.lower(Language.name) == 'english').first()
+    english_lang_id = english_lang.id if english_lang else None
+    
+    # Get all entries at this position, ordered by priority
+    entries = db.query(CollectionEntry).outerjoin(
+        Set, Set.code == CollectionEntry.set_code
+    ).filter(
+        CollectionEntry.container_id == container_id,
+        CollectionEntry.user_id == user.id,
+        CollectionEntry.position == position
+    ).order_by(
+        # English first
+        (CollectionEntry.language_id != english_lang_id).asc() if english_lang_id else CollectionEntry.id,
+        # Oldest release date
+        func.coalesce(Set.release_date, '9999-12-31'),
+        CollectionEntry.id
+    ).all()
+    
+    if not entries:
+        raise HTTPException(status_code=404, detail="No entries at this position")
+    
+    # Get the card name from the first entry
+    first_card = db.query(Card).filter(
+        Card.set_code == entries[0].set_code,
+        Card.number == entries[0].card_number
+    ).first()
+    card_name = first_card.name if first_card else "Unknown"
+    
+    result_entries = []
+    total_qty = 0
+    for entry in entries:
+        card = db.query(Card).filter(
+            Card.set_code == entry.set_code,
+            Card.number == entry.card_number
+        ).first()
+        finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None
+        language = db.query(Language).filter(Language.id == entry.language_id).first()
+        set_info = db.query(Set).filter(Set.code == entry.set_code).first()
+        
+        result_entries.append(PositionEntryResponse(
+            entry_id=entry.id,
+            set_code=entry.set_code,
+            card_number=entry.card_number,
+            card_name=card.name if card else "Unknown",
+            quantity=entry.quantity,
+            finish_name=finish.name if finish else None,
+            language_name=language.name if language else "Unknown",
+            release_date=set_info.release_date.isoformat() if set_info and set_info.release_date else None
+        ))
+        total_qty += entry.quantity
+    
+    return PositionEntriesResponse(
+        position=position,
+        card_name=card_name,
+        entries=result_entries,
+        total_quantity=total_qty
+    )
 
