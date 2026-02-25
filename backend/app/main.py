@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import cards, containers, collection, auth, metadata, decklist
+from app.routers import cards, containers, collection, auth, metadata, decklist, bulk
 
 app = FastAPI(
     title="Magic: The Gathering Collection Tracker",
@@ -25,6 +25,7 @@ app.include_router(containers.router, prefix="/api")
 app.include_router(collection.router, prefix="/api")
 app.include_router(metadata.router, prefix="/api")
 app.include_router(decklist.router, prefix="/api")
+app.include_router(bulk.router, prefix="/api")
 
 
 @app.get("/api/health")

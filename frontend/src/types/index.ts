@@ -196,3 +196,27 @@ export interface PositionEntriesResponse {
   entries: PositionEntry[];
   total_quantity: number;
 }
+
+// Bulk import/export types
+export type ImportFormat = 'auto' | 'mtggoldfish' | 'deckbox' | 'simple';
+export type ExportFormat = 'mtggoldfish' | 'deckbox' | 'simple';
+
+export interface ImportRequest {
+  container_id: number;
+  format: ImportFormat;
+  csv_data: string;
+}
+
+export interface ImportResult {
+  success: boolean;
+  imported_count: number;
+  skipped_count: number;
+  error_count: number;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface ExportRequest {
+  container_id?: number;
+  format: ExportFormat;
+}

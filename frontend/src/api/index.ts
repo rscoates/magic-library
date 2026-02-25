@@ -180,3 +180,26 @@ export const binderApi = {
     return data;
   },
 };
+
+// Bulk import/export
+export const bulkApi = {
+  importCollection: async (request: import('../types').ImportRequest): Promise<import('../types').ImportResult> => {
+    const { data } = await api.post('/bulk/import', request);
+    return data;
+  },
+
+  exportCollection: async (request: import('../types').ExportRequest): Promise<string> => {
+    const { data } = await api.post('/bulk/export', request, {
+      responseType: 'text',
+    });
+    return data;
+  },
+
+  getFormats: async (): Promise<{
+    import_formats: Array<{ id: string; name: string; description: string; example?: string }>;
+    export_formats: Array<{ id: string; name: string; description: string }>;
+  }> => {
+    const { data } = await api.get('/bulk/formats');
+    return data;
+  },
+};

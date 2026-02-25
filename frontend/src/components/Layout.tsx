@@ -20,6 +20,7 @@ import {
   Assignment as DecklistIcon,
   Folder as FolderIcon,
   Logout as LogoutIcon,
+  SwapVert as BulkIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,6 +36,7 @@ const menuItems = [
   { text: 'Search Collection', icon: <SearchIcon />, path: '/search' },
   { text: 'Check Decklist', icon: <DecklistIcon />, path: '/decklist' },
   { text: 'Manage Containers', icon: <FolderIcon />, path: '/containers' },
+  { text: 'Import / Export', icon: <BulkIcon />, path: '/bulk' },
 ];
 
 export default function Layout({ children }: LayoutProps) {

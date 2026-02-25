@@ -5,6 +5,7 @@ import AddCard from './pages/AddCard';
 import SearchCollection from './pages/SearchCollection';
 import DecklistChecker from './pages/DecklistChecker';
 import ManageContainers from './pages/ManageContainers';
+import BulkImportExport from './pages/BulkImportExport';
 import Login from './pages/Login';
 import { useAuth } from './contexts/AuthContext';
 
@@ -31,6 +32,7 @@ function App() {
         <Route path="/search" element={<SearchCollection />} />
         <Route path="/decklist" element={<DecklistChecker />} />
         <Route path="/containers" element={<ManageContainers />} />
+        <Route path="/bulk" element={<BulkImportExport />} />
       </Routes>
     </Layout>
   );
