@@ -35,7 +35,7 @@ import {
   Add as AddIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
-import { binderApi, collectionApi, containersApi } from '../api';
+import { binderApi, containersApi } from '../api';
 import { getErrorMessage } from '../api/client';
 import type { BinderPage, BinderSlot, PositionEntriesResponse } from '../types';
 
