@@ -34,6 +34,7 @@ import {
   Edit as EditIcon,
   Add as AddIcon,
   Settings as SettingsIcon,
+  LastPage,
 } from '@mui/icons-material';
 import { binderApi, containersApi } from '../api';
 import { getErrorMessage } from '../api/client';
@@ -384,6 +385,13 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
           disabled={loading || !binderPage || page >= binderPage.total_pages}
         >
           <NextIcon />
+        </IconButton>
+
+        <IconButton
+          onClick={() => loadPage(binderPage?.total_pages || page + 1)}
+          disabled={loading || !binderPage || page >= binderPage.total_pages}
+        >
+          <LastPage />
         </IconButton>
         
         {/* Add page button */}
