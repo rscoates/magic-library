@@ -91,10 +91,10 @@ export default function CollectionEntries() {
     try {
       await collectionApi.update(id, {
         quantity: row.quantity,
-        finish_id: row.finish_id ?? null,
+        finish_id: row.finish_id ?? undefined,
         language_id: row.language_id,
-        comments: row.comments ?? null,
-        position: row.position ?? null,
+        comments: row.comments ?? undefined,
+        position: row.position ?? undefined,
       });
       setDirtyIds((d) => {
         const copy = { ...d };
