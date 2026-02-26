@@ -261,24 +261,49 @@ def update_collection_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
     
-    if data.quantity is not None:
-        if data.quantity < 1:
+    # Use model_fields_set to determine which fields were provided by the client
+    provided = getattr(data, 'model_fields_set', None)
+
+    if provided is None:
+        # Fallback for older pydantic versions: treat any non-None as provided
+        provided = set()
+        if data.quantity is not None:
+            provided.add('quantity')
+        if 'finish_id' in data.__dict__:
+            provided.add('finish_id')
+        if data.language_id is not None:
+            provided.add('language_id')
+        if data.container_id is not None:
+            provided.add('container_id')
+        if 'comments' in data.__dict__:
+            provided.add('comments')
+        if 'position' in data.__dict__:
+            provided.add('position')
+
+    if 'quantity' in provided:
+        if data.quantity is None or data.quantity < 1:
             raise HTTPException(status_code=400, detail="Quantity must be at least 1")
         entry.quantity = data.quantity
-    
-    if data.finish_id is not None:
-        finish = db.query(Finish).filter(Finish.id == data.finish_id).first()
-        if not finish:
-            raise HTTPException(status_code=400, detail="Invalid finish")
+
+    if 'finish_id' in provided:
+        # finish_id may be explicitly null to clear the finish
+        if data.finish_id is not None:
+            finish = db.query(Finish).filter(Finish.id == data.finish_id).first()
+            if not finish:
+                raise HTTPException(status_code=400, detail="Invalid finish")
         entry.finish_id = data.finish_id
-    
-    if data.language_id is not None:
+
+    if 'language_id' in provided:
+        if data.language_id is None:
+            raise HTTPException(status_code=400, detail="Invalid language")
         language = db.query(Language).filter(Language.id == data.language_id).first()
         if not language:
             raise HTTPException(status_code=400, detail="Invalid language")
         entry.language_id = data.language_id
-    
-    if data.container_id is not None:
+
+    if 'container_id' in provided:
+        if data.container_id is None:
+            raise HTTPException(status_code=404, detail="Container not found")
         container = db.query(Container).filter(
             Container.id == data.container_id,
             Container.user_id == user.id
@@ -286,9 +311,12 @@ def update_collection_entry(
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
         entry.container_id = data.container_id
-    
-    if data.comments is not None:
+
+    if 'comments' in provided:
         entry.comments = data.comments
+
+    if 'position' in provided:
+        entry.position = data.position
     
     db.commit()
     db.refresh(entry)
