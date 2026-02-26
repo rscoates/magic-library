@@ -7,6 +7,7 @@ import DecklistChecker from './pages/DecklistChecker';
 import ManageContainers from './pages/ManageContainers';
 import BulkImportExport from './pages/BulkImportExport';
 import Login from './pages/Login';
+import CollectionEntries from './pages/CollectionEntries';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
         <Route path="/search" element={<SearchCollection />} />
         <Route path="/decklist" element={<DecklistChecker />} />
         <Route path="/containers" element={<ManageContainers />} />
+        <Route path="/collection-entries" element={<CollectionEntries />} />
         <Route path="/bulk" element={<BulkImportExport />} />
       </Routes>
     </Layout>

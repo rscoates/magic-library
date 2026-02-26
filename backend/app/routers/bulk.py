@@ -259,6 +259,22 @@ def import_collection(
     errors = []
     warnings = []
     
+    # Position tracking for binder imports
+    # Get the starting position (max existing position + 1)
+    if is_binder:
+        max_pos = db.query(func.max(CollectionEntry.position)).filter(
+            CollectionEntry.container_id == request.container_id,
+            CollectionEntry.user_id == user.id
+        ).scalar()
+        next_position = (max_pos or 0) + 1
+    else:
+        next_position = 1
+    
+    # Track card names seen in THIS import and their assigned positions
+    # Key: card_name, Value: position (or None if card already existed in binder)
+    seen_names_in_import: dict = {}
+    last_card_name: str = None
+    
     for row_num, row in enumerate(data_rows, start=2):
         try:
             if not row or all(not cell.strip() for cell in row):
@@ -325,25 +341,46 @@ def import_collection(
             # Determine position for binder
             position = None
             if is_binder:
-                # Check if card name already exists in container
-                existing_same_name = db.query(CollectionEntry).join(
-                    Card,
-                    (Card.set_code == CollectionEntry.set_code) & (Card.number == CollectionEntry.card_number)
-                ).filter(
-                    CollectionEntry.container_id == request.container_id,
-                    CollectionEntry.user_id == user.id,
-                    CollectionEntry.position.isnot(None),
-                    Card.name == card.name
-                ).first()
+                card_name_for_pos = card.name
                 
-                if existing_same_name:
-                    position = existing_same_name.position
+                # Check if we've seen this card name in this import
+                if card_name_for_pos in seen_names_in_import:
+                    # Check if it's consecutive (same as previous row)
+                    if card_name_for_pos == last_card_name:
+                        # Consecutive duplicate - share the same position
+                        position = seen_names_in_import[card_name_for_pos]
+                    else:
+                        # Non-consecutive duplicate - assign new position
+                        position = next_position
+                        next_position += 1
+                        seen_names_in_import[card_name_for_pos] = position
                 else:
-                    max_pos = db.query(func.max(CollectionEntry.position)).filter(
+                    # First time seeing this card name in import
+                    # Check if it already exists in the binder (from before this import)
+                    existing_in_binder = db.query(CollectionEntry).join(
+                        Card,
+                        (Card.set_code == CollectionEntry.set_code) & (Card.number == CollectionEntry.card_number)
+                    ).filter(
                         CollectionEntry.container_id == request.container_id,
-                        CollectionEntry.user_id == user.id
-                    ).scalar()
-                    position = (max_pos or 0) + 1
+                        CollectionEntry.user_id == user.id,
+                        CollectionEntry.position.isnot(None),
+                        Card.name == card_name_for_pos
+                    ).first()
+                    
+                    if existing_in_binder:
+                        # Card already in binder - don't assign position, add warning
+                        position = None
+                        seen_names_in_import[card_name_for_pos] = None
+                        warnings.append(
+                            f"Row {row_num}: '{card_name_for_pos}' already in binder at position {existing_in_binder.position}, new copy added without position"
+                        )
+                    else:
+                        # New card name - assign next position
+                        position = next_position
+                        next_position += 1
+                        seen_names_in_import[card_name_for_pos] = position
+                
+                last_card_name = card_name_for_pos
             
             # Check for existing entry
             existing = db.query(CollectionEntry).filter(
