@@ -120,6 +120,11 @@ export default function AddCard() {
       setQuantity(1);
       setFinishId(null);
       setComments('');
+      // Reset language back to English for the next add
+      const english = languages.find((l) => l.name.toLowerCase() === 'english');
+      if (english) {
+        setLanguageId(english.id);
+      }
       setActiveStep(1);
     } catch (err) {
       setError(getErrorMessage(err));
