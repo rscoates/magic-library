@@ -22,6 +22,7 @@ import {
   Logout as LogoutIcon,
   SwapVert as BulkIcon,
   ListAlt as ListIcon,
+  AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,6 +39,7 @@ const menuItems = [
   { text: 'Check Decklist', icon: <DecklistIcon />, path: '/decklist' },
   { text: 'Manage Containers', icon: <FolderIcon />, path: '/containers' },
   { text: 'Collection Entries', icon: <ListIcon />, path: '/collection-entries' },
+  { text: 'Collection Value', icon: <MoneyIcon />, path: '/value' },
   { text: 'Import / Export', icon: <BulkIcon />, path: '/bulk' },
 ];
 

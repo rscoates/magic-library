@@ -1,7 +1,12 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import cards, containers, collection, auth, metadata, decklist, bulk
+from app.routers import cards, containers, collection, auth, metadata, decklist, bulk, pricing
+from app.services.pricing import load_prices
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Magic: The Gathering Collection Tracker",
@@ -26,6 +31,17 @@ app.include_router(collection.router, prefix="/api")
 app.include_router(metadata.router, prefix="/api")
 app.include_router(decklist.router, prefix="/api")
 app.include_router(bulk.router, prefix="/api")
+app.include_router(pricing.router, prefix="/api")
+
+
+@app.on_event("startup")
+def startup_load_prices():
+    """Load Scryfall pricing data into memory on startup."""
+    count = load_prices()
+    if count > 0:
+        logger.info(f"Pricing data loaded: {count} cards")
+    else:
+        logger.warning("Pricing data not loaded. Place a Scryfall default-cards JSON in the data directory.")
 
 
 @app.get("/api/health")

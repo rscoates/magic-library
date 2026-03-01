@@ -12,6 +12,8 @@ import type {
   DecklistResult,
   User,
   AuthStatus,
+  TopCardsResponse,
+  PricingStatusResponse,
 } from '../types';
 
 // Auth
@@ -200,6 +202,26 @@ export const bulkApi = {
     export_formats: Array<{ id: string; name: string; description: string }>;
   }> => {
     const { data } = await api.get('/bulk/formats');
+    return data;
+  },
+};
+
+// Pricing
+export const pricingApi = {
+  getStatus: async (): Promise<PricingStatusResponse> => {
+    const { data } = await api.get('/pricing/status');
+    return data;
+  },
+
+  reload: async (): Promise<PricingStatusResponse> => {
+    const { data } = await api.post('/pricing/reload');
+    return data;
+  },
+
+  getCollectionValue: async (containerId?: number, limit = 250): Promise<TopCardsResponse> => {
+    const { data } = await api.get('/pricing/collection', {
+      params: { container_id: containerId, limit },
+    });
     return data;
   },
 };

@@ -8,6 +8,7 @@ import ManageContainers from './pages/ManageContainers';
 import BulkImportExport from './pages/BulkImportExport';
 import Login from './pages/Login';
 import CollectionEntries from './pages/CollectionEntries';
+import CollectionValue from './pages/CollectionValue';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
         <Route path="/decklist" element={<DecklistChecker />} />
         <Route path="/containers" element={<ManageContainers />} />
         <Route path="/collection-entries" element={<CollectionEntries />} />
+        <Route path="/value" element={<CollectionValue />} />
         <Route path="/bulk" element={<BulkImportExport />} />
       </Routes>
     </Layout>

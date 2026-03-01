@@ -24,6 +24,7 @@ services:
       SECRET_KEY: change-me-in-production-use-a-secure-random-key
     volumes:
       - ./AllPrintings.json:/app/data/AllPrintings.json:ro
+      - ./backend/default-cards-20260301100818.json:/app/data/default-cards-20260301100818.json:ro
     ports:
       - "8000:8000"
     depends_on:

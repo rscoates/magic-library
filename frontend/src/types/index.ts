@@ -220,3 +220,36 @@ export interface ExportRequest {
   container_id?: number;
   format: ExportFormat;
 }
+
+// Pricing types
+export interface PricedCard {
+  entry_id: number;
+  card_name: string;
+  set_code: string;
+  card_number: string;
+  finish_name: string | null;
+  quantity: number;
+  unit_price: number | null;
+  total_price: number | null;
+  container_name: string;
+  container_id: number;
+}
+
+export interface CollectionValueSummary {
+  total_value: number;
+  total_cards: number;
+  total_unique: number;
+  priced_cards: number;
+  unpriced_cards: number;
+  pricing_available: boolean;
+}
+
+export interface TopCardsResponse {
+  summary: CollectionValueSummary;
+  cards: PricedCard[];
+}
+
+export interface PricingStatusResponse {
+  loaded: boolean;
+  message: string;
+}

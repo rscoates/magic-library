@@ -1,0 +1,5 @@
+default-cards*.json
+data/AllPrintings.json
+__pycache__/
+*.pyc
+.env
