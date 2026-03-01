@@ -255,3 +255,29 @@ export interface PricingStatusResponse {
   loaded: boolean;
   message: string;
 }
+
+// Deck view types
+export interface DeckViewCard {
+  entry_id: number;
+  set_code: string;
+  card_number: string;
+  card_name: string;
+  quantity: number;
+  finish_name: string | null;
+  language_name: string;
+  type_line: string | null;
+  mana_value: number | null;
+}
+
+export interface DeckViewCategory {
+  name: string;
+  total_quantity: number;
+  cards: DeckViewCard[];
+}
+
+export interface DeckViewResponse {
+  container_id: number;
+  container_name: string;
+  total_cards: number;
+  categories: DeckViewCategory[];
+}

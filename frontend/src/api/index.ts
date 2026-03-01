@@ -183,6 +183,14 @@ export const binderApi = {
   },
 };
 
+// Deck view
+export const deckViewApi = {
+  get: async (containerId: number): Promise<import('../types').DeckViewResponse> => {
+    const { data } = await api.get(`/collection/deck/${containerId}`);
+    return data;
+  },
+};
+
 // Bulk import/export
 export const bulkApi = {
   importCollection: async (request: import('../types').ImportRequest): Promise<import('../types').ImportResult> => {

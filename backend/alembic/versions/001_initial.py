@@ -58,6 +58,8 @@ def upgrade() -> None:
         sa.Column('number', sa.String(20), nullable=False),
         sa.Column('name', sa.String(500), nullable=False),
         sa.Column('rarity', sa.String(50), nullable=False),
+        sa.Column('type_line', sa.String(500), nullable=True),
+        sa.Column('mana_value', sa.Float(), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_cards_set_number', 'cards', ['set_code', 'number'], unique=True)
@@ -171,7 +173,9 @@ def upgrade() -> None:
                     'set_code': set_code,
                     'number': card.get('number', ''),
                     'name': card.get('name', ''),
-                    'rarity': card.get('rarity', 'common')
+                    'rarity': card.get('rarity', 'common'),
+                    'type_line': card.get('type', None),
+                    'mana_value': card.get('manaValue', None),
                 })
         
         print(f"Inserting {len(cards_data)} cards...")
@@ -182,8 +186,8 @@ def upgrade() -> None:
             batch = cards_data[i:i + batch_size]
             connection.execute(
                 sa.text("""
-                    INSERT INTO cards (set_code, number, name, rarity) 
-                    VALUES (:set_code, :number, :name, :rarity)
+                    INSERT INTO cards (set_code, number, name, rarity, type_line, mana_value) 
+                    VALUES (:set_code, :number, :name, :rarity, :type_line, :mana_value)
                     ON CONFLICT (set_code, number) DO NOTHING
                 """),
                 batch

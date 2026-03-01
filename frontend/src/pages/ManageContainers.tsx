@@ -31,11 +31,13 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   MenuBook as BinderIcon,
+  Style as DeckIcon,
 } from '@mui/icons-material';
 import { containersApi } from '../api';
 import { getErrorMessage } from '../api/client';
 import type { Container, ContainerType, ContainerCreate } from '../types';
 import BinderView from '../components/BinderView';
+import DeckView from '../components/DeckView';
 
 export default function ManageContainers() {
   const [containers, setContainers] = useState<Container[]>([]);
@@ -60,9 +62,18 @@ export default function ManageContainers() {
   const [binderViewOpen, setBinderViewOpen] = useState(false);
   const [selectedBinderContainer, setSelectedBinderContainer] = useState<Container | null>(null);
 
+  // Deck view state
+  const [deckViewOpen, setDeckViewOpen] = useState(false);
+  const [selectedDeckContainer, setSelectedDeckContainer] = useState<Container | null>(null);
+
   const handleOpenBinderView = (container: Container) => {
     setSelectedBinderContainer(container);
     setBinderViewOpen(true);
+  };
+
+  const handleOpenDeckView = (container: Container) => {
+    setSelectedDeckContainer(container);
+    setDeckViewOpen(true);
   };
 
   useEffect(() => {
@@ -254,6 +265,13 @@ export default function ManageContainers() {
                             </IconButton>
                           </Tooltip>
                         )}
+                        {container.container_type.name.toLowerCase() === 'deck' && (
+                          <Tooltip title="View as Deck">
+                            <IconButton size="small" color="secondary" onClick={() => handleOpenDeckView(container)}>
+                              <DeckIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         <IconButton size="small" onClick={() => handleOpenDialog(container)}>
                           <EditIcon />
                         </IconButton>
@@ -384,6 +402,25 @@ export default function ManageContainers() {
               containerId={selectedBinderContainer.id}
               containerName={selectedBinderContainer.name}
               onClose={() => setBinderViewOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Deck View Dialog */}
+      <Dialog
+        open={deckViewOpen}
+        onClose={() => setDeckViewOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: { height: '90vh' } }}
+      >
+        <DialogContent sx={{ p: 2, height: '100%' }}>
+          {selectedDeckContainer && (
+            <DeckView
+              containerId={selectedDeckContainer.id}
+              containerName={selectedDeckContainer.name}
+              onClose={() => setDeckViewOpen(false)}
             />
           )}
         </DialogContent>

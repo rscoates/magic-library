@@ -6,6 +6,8 @@ class CardBase(BaseModel):
     number: str
     name: str
     rarity: str
+    type_line: str | None = None
+    mana_value: float | None = None
 
 
 class CardResponse(CardBase):

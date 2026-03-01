@@ -831,3 +831,121 @@ def get_entries_at_position(
         total_quantity=total_qty
     )
 
+
+# ---- Deck View ----
+
+class DeckViewCard(BaseModel):
+    """A card entry in the deck view."""
+    entry_id: int
+    set_code: str
+    card_number: str
+    card_name: str
+    quantity: int
+    finish_name: Optional[str] = None
+    language_name: str
+    type_line: Optional[str] = None
+    mana_value: Optional[float] = None
+
+
+class DeckViewCategory(BaseModel):
+    """A category of cards (e.g. Creatures, Lands)."""
+    name: str
+    total_quantity: int
+    cards: List[DeckViewCard]
+
+
+class DeckViewResponse(BaseModel):
+    """Response for deck view."""
+    container_id: int
+    container_name: str
+    total_cards: int
+    categories: List[DeckViewCategory]
+
+
+def _categorise_card(type_line: Optional[str]) -> str:
+    """Assign a card to a deck-view category based on its type line."""
+    if not type_line:
+        return "Other"
+    tl = type_line.lower()
+    if "land" in tl:
+        return "Lands"
+    if "creature" in tl:
+        return "Creatures"
+    if "instant" in tl or "sorcery" in tl:
+        return "Instants & Sorceries"
+    return "Other"
+
+
+_CATEGORY_ORDER = ["Creatures", "Instants & Sorceries", "Other", "Lands"]
+
+
+@router.get("/deck/{container_id}", response_model=DeckViewResponse)
+def get_deck_view(
+    container_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get all cards in a deck container, grouped by type category and sorted by mana value."""
+    container = db.query(Container).filter(
+        Container.id == container_id,
+        Container.user_id == user.id,
+    ).first()
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    entries = db.query(CollectionEntry).filter(
+        CollectionEntry.container_id == container_id,
+        CollectionEntry.user_id == user.id,
+    ).all()
+
+    # Build card list with type/mana info
+    buckets: dict[str, list[DeckViewCard]] = {cat: [] for cat in _CATEGORY_ORDER}
+
+    for entry in entries:
+        card = db.query(Card).filter(
+            Card.set_code == entry.set_code,
+            Card.number == entry.card_number,
+        ).first()
+        language = db.query(Language).filter(Language.id == entry.language_id).first()
+        finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None
+
+        type_line = card.type_line if card else None
+        mana_value = card.mana_value if card else None
+        category = _categorise_card(type_line)
+
+        buckets[category].append(DeckViewCard(
+            entry_id=entry.id,
+            set_code=entry.set_code,
+            card_number=entry.card_number,
+            card_name=card.name if card else "Unknown",
+            quantity=entry.quantity,
+            finish_name=finish.name if finish else None,
+            language_name=language.name if language else "Unknown",
+            type_line=type_line,
+            mana_value=mana_value,
+        ))
+
+    # Sort each bucket by mana_value then name
+    for cat in buckets:
+        buckets[cat].sort(key=lambda c: (c.mana_value if c.mana_value is not None else 999, c.card_name))
+
+    categories = []
+    total_cards = 0
+    for cat in _CATEGORY_ORDER:
+        cards_in_cat = buckets[cat]
+        if not cards_in_cat:
+            continue
+        cat_qty = sum(c.quantity for c in cards_in_cat)
+        total_cards += cat_qty
+        categories.append(DeckViewCategory(
+            name=cat,
+            total_quantity=cat_qty,
+            cards=cards_in_cat,
+        ))
+
+    return DeckViewResponse(
+        container_id=container.id,
+        container_name=container.name,
+        total_cards=total_cards,
+        categories=categories,
+    )
