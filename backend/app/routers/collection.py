@@ -151,6 +151,7 @@ def add_to_collection(
 @router.get("/", response_model=List[CollectionEntryResponse])
 def list_collection(
     container_id: Optional[int] = None,
+    include_sold: bool = Query(False, description="Include cards in sold containers"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -159,6 +160,13 @@ def list_collection(
     
     if container_id:
         query = query.filter(CollectionEntry.container_id == container_id)
+    elif not include_sold:
+        # Exclude entries in sold containers
+        sold_container_ids = db.query(Container.id).filter(
+            Container.user_id == user.id,
+            Container.is_sold == True
+        ).subquery()
+        query = query.filter(~CollectionEntry.container_id.in_(sold_container_ids))
     
     entries = query.all()
     
@@ -194,11 +202,21 @@ def list_collection(
 @router.get("/search", response_model=List[CollectionSummary])
 def search_collection(
     q: str = Query(..., min_length=1),
+    include_sold: bool = Query(False, description="Include cards in sold containers"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Search owned cards and show total quantities with locations."""
     query = q.strip().lower()
+    
+    # Get sold container IDs for filtering
+    sold_container_ids = set()
+    if not include_sold:
+        sold_containers = db.query(Container.id).filter(
+            Container.user_id == user.id,
+            Container.is_sold == True
+        ).all()
+        sold_container_ids = {c[0] for c in sold_containers}
     
     # Find matching cards
     cards = db.query(Card).filter(Card.name.ilike(f"%{query}%")).all()
@@ -218,6 +236,10 @@ def search_collection(
         total_qty = 0
         
         for entry in entries:
+            # Skip entries in sold containers if not including sold
+            if entry.container_id in sold_container_ids:
+                continue
+            
             container = db.query(Container).filter(Container.id == entry.container_id).first()
             language = db.query(Language).filter(Language.id == entry.language_id).first()
             finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None
@@ -232,6 +254,9 @@ def search_collection(
                 comments=entry.comments
             ))
             total_qty += entry.quantity
+        
+        if not locations:
+            continue
         
         results.append(CollectionSummary(
             set_code=card.set_code,

@@ -23,6 +23,8 @@ import {
   IconButton,
   Chip,
   Tooltip,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -102,6 +104,7 @@ export default function ManageContainers() {
         description: container.description || '',
         type_id: container.type_id,
         parent_id: container.parent_id || undefined,
+        is_sold: container.is_sold,
       });
     } else {
       setEditingContainer(null);
@@ -110,6 +113,7 @@ export default function ManageContainers() {
         description: '',
         type_id: containerTypes[0]?.id || 0,
         parent_id: undefined,
+        is_sold: false,
       });
     }
     setDialogOpen(true);
@@ -228,6 +232,9 @@ export default function ManageContainers() {
                       </TableCell>
                       <TableCell>
                         <Chip label={container.container_type.name} size="small" />
+                        {container.is_sold && (
+                          <Chip label="Sold" size="small" color="warning" sx={{ ml: 0.5 }} />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">
@@ -319,6 +326,19 @@ export default function ManageContainers() {
             multiline
             rows={3}
           />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={formData.is_sold || false}
+                onChange={(e) => setFormData({ ...formData, is_sold: e.target.checked })}
+              />
+            }
+            label="Sold container"
+            sx={{ mt: 1 }}
+          />
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4 }}>
+            Cards in sold containers are excluded from searches, decklist checks, and value calculations by default.
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>

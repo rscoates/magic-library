@@ -104,6 +104,14 @@ def check_decklist(
     """Check a decklist against the collection and return owned cards."""
     parsed_cards = parse_decklist(data.decklist)
     
+    # Get sold container IDs to exclude
+    sold_container_ids = set(
+        c[0] for c in db.query(Container.id).filter(
+            Container.user_id == user.id,
+            Container.is_sold == True
+        ).all()
+    )
+    
     results = []
     total_requested = 0
     total_owned = 0
@@ -140,6 +148,10 @@ def check_decklist(
             ).all()
             
             for entry in entries:
+                # Skip entries in sold containers
+                if entry.container_id in sold_container_ids:
+                    continue
+                
                 container = db.query(Container).filter(Container.id == entry.container_id).first()
                 language = db.query(Language).filter(Language.id == entry.language_id).first()
                 finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None

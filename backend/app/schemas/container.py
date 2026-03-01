@@ -18,6 +18,7 @@ class ContainerCreate(BaseModel):
     parent_id: Optional[int] = None
     binder_columns: Literal[2, 3, 4] = 3
     binder_fill_row: bool = False
+    is_sold: bool = False
     
     @field_validator("name")
     @classmethod
@@ -34,6 +35,7 @@ class ContainerUpdate(BaseModel):
     parent_id: Optional[int] = None
     binder_columns: Optional[Literal[2, 3, 4]] = None
     binder_fill_row: Optional[bool] = None
+    is_sold: Optional[bool] = None
 
 
 class ContainerResponse(BaseModel):
@@ -47,6 +49,7 @@ class ContainerResponse(BaseModel):
     created_at: datetime
     binder_columns: int = 3
     binder_fill_row: bool = False
+    is_sold: bool = False
     children: List["ContainerResponse"] = []
     
     class Config:

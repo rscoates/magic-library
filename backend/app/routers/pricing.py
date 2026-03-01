@@ -73,6 +73,7 @@ def reload_pricing(user: User = Depends(get_current_user)):
 @router.get("/collection", response_model=TopCardsResponse)
 def collection_value(
     container_id: Optional[int] = Query(None, description="Filter by container (omit for entire collection)"),
+    include_sold: bool = Query(False, description="Include cards in sold containers"),
     limit: int = Query(250, ge=1, le=1000, description="Number of top cards to return"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -89,6 +90,13 @@ def collection_value(
     query = db.query(CollectionEntry).filter(CollectionEntry.user_id == user.id)
     if container_id is not None:
         query = query.filter(CollectionEntry.container_id == container_id)
+    elif not include_sold:
+        # Exclude entries in sold containers
+        sold_ids = db.query(Container.id).filter(
+            Container.user_id == user.id,
+            Container.is_sold == True
+        ).subquery()
+        query = query.filter(~CollectionEntry.container_id.in_(sold_ids))
     
     entries = query.all()
     

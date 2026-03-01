@@ -116,13 +116,13 @@ export const collectionApi = {
     return data;
   },
 
-  list: async (containerId?: number): Promise<CollectionEntry[]> => {
-    const { data } = await api.get('/collection/', { params: { container_id: containerId } });
+  list: async (containerId?: number, includeSold?: boolean): Promise<CollectionEntry[]> => {
+    const { data } = await api.get('/collection/', { params: { container_id: containerId, include_sold: includeSold } });
     return data;
   },
 
-  search: async (query: string): Promise<CollectionSummary[]> => {
-    const { data } = await api.get('/collection/search', { params: { q: query } });
+  search: async (query: string, includeSold?: boolean): Promise<CollectionSummary[]> => {
+    const { data } = await api.get('/collection/search', { params: { q: query, include_sold: includeSold } });
     return data;
   },
 
@@ -218,9 +218,9 @@ export const pricingApi = {
     return data;
   },
 
-  getCollectionValue: async (containerId?: number, limit = 250): Promise<TopCardsResponse> => {
+  getCollectionValue: async (containerId?: number, limit = 250, includeSold?: boolean): Promise<TopCardsResponse> => {
     const { data } = await api.get('/pricing/collection', {
-      params: { container_id: containerId, limit },
+      params: { container_id: containerId, limit, include_sold: includeSold },
     });
     return data;
   },

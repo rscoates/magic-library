@@ -29,6 +29,9 @@ class Container(Base):
     binder_columns = Column(Integer, nullable=False, default=3)  # 2, 3, or 4
     binder_fill_row = Column(Boolean, nullable=False, default=False)  # Fill row with copies vs badge
     
+    # Sold containers track cards that have been sold
+    is_sold = Column(Boolean, nullable=False, default=False)
+    
     container_type = relationship("ContainerType", back_populates="containers")
     parent = relationship("Container", remote_side=[id], backref="children")
     collection_entries = relationship("CollectionEntry", back_populates="container", cascade="all, delete-orphan")

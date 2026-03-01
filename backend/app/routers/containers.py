@@ -130,7 +130,8 @@ def create_container(
         type_id=data.type_id,
         parent_id=data.parent_id,
         depth=depth,
-        user_id=user.id
+        user_id=user.id,
+        is_sold=data.is_sold
     )
     
     db.add(container)
@@ -190,6 +191,9 @@ def update_container(
     
     if data.binder_fill_row is not None:
         container.binder_fill_row = data.binder_fill_row
+    
+    if data.is_sold is not None:
+        container.is_sold = data.is_sold
     
     db.commit()
     db.refresh(container)

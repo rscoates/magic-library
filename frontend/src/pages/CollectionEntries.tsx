@@ -17,6 +17,8 @@ import {
   Typography,
   FormControl,
   InputLabel,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import { Save as SaveIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { collectionApi, metadataApi } from '../api';
@@ -33,11 +35,12 @@ export default function CollectionEntries() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [dirtyIds, setDirtyIds] = useState<Record<number, boolean>>({});
+  const [includeSold, setIncludeSold] = useState(false);
 
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [includeSold]);
 
   useEffect(() => {
     applyFilter();
@@ -48,7 +51,7 @@ export default function CollectionEntries() {
     setLoading(true);
     try {
       const [e, langs, fins] = await Promise.all([
-        collectionApi.list(),
+        collectionApi.list(undefined, includeSold),
         metadataApi.listLanguages(),
         metadataApi.listFinishes(),
       ]);
@@ -102,7 +105,7 @@ export default function CollectionEntries() {
         return copy;
       });
       // refresh the entry from server to get computed names
-      const refreshed = await collectionApi.list();
+      const refreshed = await collectionApi.list(undefined, includeSold);
       setEntries(refreshed);
     } catch (err) {
       alert(getErrorMessage(err));
@@ -152,6 +155,16 @@ export default function CollectionEntries() {
         <Button variant="outlined" onClick={loadAll} disabled={loading}>
           Refresh
         </Button>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={includeSold}
+              onChange={(e) => setIncludeSold(e.target.checked)}
+              size="small"
+            />
+          }
+          label="Include sold"
+        />
       </Box>
 
       <Paper>

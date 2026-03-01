@@ -21,6 +21,8 @@ import {
   Button,
   Tooltip,
   TextField,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -64,6 +66,7 @@ export default function CollectionValue() {
   const [limit, setLimit] = useState(250);
   const [reloading, setReloading] = useState(false);
   const [filterText, setFilterText] = useState('');
+  const [includeSold, setIncludeSold] = useState(false);
 
   const loadContainers = useCallback(async () => {
     try {
@@ -81,6 +84,7 @@ export default function CollectionValue() {
       const result = await pricingApi.getCollectionValue(
         selectedContainer === '' ? undefined : selectedContainer,
         limit,
+        includeSold,
       );
       setData(result);
     } catch (err) {
@@ -88,7 +92,7 @@ export default function CollectionValue() {
     } finally {
       setLoading(false);
     }
-  }, [selectedContainer, limit]);
+  }, [selectedContainer, limit, includeSold]);
 
   useEffect(() => {
     loadContainers();
@@ -178,6 +182,17 @@ export default function CollectionValue() {
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
           sx={{ minWidth: 180 }}
+        />
+
+        <FormControlLabel
+          control={
+            <Switch
+              checked={includeSold}
+              onChange={(e) => setIncludeSold(e.target.checked)}
+              size="small"
+            />
+          }
+          label="Include sold"
         />
 
         <Tooltip title="Reload pricing data from disk">

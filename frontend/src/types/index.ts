@@ -24,6 +24,7 @@ export interface Container {
   created_at: string;
   binder_columns: 2 | 3 | 4;
   binder_fill_row: boolean;
+  is_sold: boolean;
   children: Container[];
 }
 
@@ -34,6 +35,7 @@ export interface ContainerCreate {
   parent_id?: number;
   binder_columns?: 2 | 3 | 4;
   binder_fill_row?: boolean;
+  is_sold?: boolean;
 }
 
 // Collection types

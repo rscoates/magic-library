@@ -15,6 +15,8 @@ import {
   IconButton,
   Collapse,
   Chip,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -32,6 +34,7 @@ export default function SearchCollection() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [includeSold, setIncludeSold] = useState(false);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -41,7 +44,7 @@ export default function SearchCollection() {
     setSearched(true);
 
     try {
-      const data = await collectionApi.search(query);
+      const data = await collectionApi.search(query, includeSold);
       setResults(data);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -96,6 +99,17 @@ export default function SearchCollection() {
               </InputAdornment>
             ),
           }}
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={includeSold}
+              onChange={(e) => setIncludeSold(e.target.checked)}
+              size="small"
+            />
+          }
+          label="Include sold"
+          sx={{ mt: 1 }}
         />
       </Paper>
 
