@@ -531,8 +531,9 @@ export default function BinderView({ containerId, containerName, onClose }: Bind
               label="Fill row with copies"
             />
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-              When enabled, multiple copies of a card fill consecutive slots in the same row.
-              Overflow shows a "+N" badge.
+              When enabled, each card name gets its own row. Copies are expanded as individual
+              slots grouped by version (oldest printing first), up to one row per card.
+              A "+N" badge indicates additional hidden copies.
             </Typography>
           </Box>
         </DialogContent>

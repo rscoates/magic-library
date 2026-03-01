@@ -526,13 +526,21 @@ def get_binder_page(
     max_position = max(distinct_positions) if distinct_positions else 0
     
     if fill_row_mode:
-        # In fill mode, we need to calculate slots differently
-        # Each position can expand to up to 4 slots
-        # We need to figure out which positions fall on this page
+        # Fill-row mode: each card name (position) gets exactly one row.
+        # Copies are expanded (one slot per copy), grouped by version,
+        # truncated to `columns` per card name, padded with empties.
+        # Each page shows `rows` card names.
         
-        # Build expanded slot list for all positions
-        all_expanded_slots = []
-        for pos in distinct_positions:
+        total_positions = len(distinct_positions)
+        total_pages = max(1, (total_positions + rows - 1) // rows)
+        
+        # Which positions (card names) to show on this page
+        start_pos_idx = (page - 1) * rows
+        end_pos_idx = min(start_pos_idx + rows, total_positions)
+        page_positions = distinct_positions[start_pos_idx:end_pos_idx]
+        
+        slots = []
+        for pos in page_positions:
             # Get all entries at this position, ordered by priority:
             # 1. English first, 2. Oldest set release date, 3. Entry ID
             entries_at_pos = db.query(CollectionEntry).outerjoin(
@@ -547,8 +555,10 @@ def get_binder_page(
                 # Oldest release date
                 func.coalesce(Set.release_date, '9999-12-31'),
                 CollectionEntry.id
-            ).limit(4).all()
+            ).all()
             
+            # Expand entries into individual slots (one per copy, grouped by version)
+            row_slots = []
             for entry in entries_at_pos:
                 card = db.query(Card).filter(
                     Card.set_code == entry.set_code,
@@ -557,28 +567,37 @@ def get_binder_page(
                 finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None
                 language = db.query(Language).filter(Language.id == entry.language_id).first()
                 
-                all_expanded_slots.append(BinderSlot(
-                    position=pos,
-                    entry_id=entry.id,
-                    set_code=entry.set_code,
-                    card_number=entry.card_number,
-                    card_name=card.name if card else "Unknown",
-                    quantity=entry.quantity,
-                    finish_name=finish.name if finish else None,
-                    language_name=language.name if language else "Unknown",
-                    is_empty=False
-                ))
+                for _ in range(entry.quantity):
+                    row_slots.append(BinderSlot(
+                        position=pos,
+                        entry_id=entry.id,
+                        set_code=entry.set_code,
+                        card_number=entry.card_number,
+                        card_name=card.name if card else "Unknown",
+                        quantity=1,
+                        finish_name=finish.name if finish else None,
+                        language_name=language.name if language else "Unknown",
+                        is_empty=False
+                    ))
+            
+            # Calculate overflow (copies that don't fit in one row)
+            total_copies = len(row_slots)
+            overflow = max(0, total_copies - columns)
+            
+            # Truncate to one row
+            row_slots = row_slots[:columns]
+            
+            # Add overflow indicator to the last card slot
+            if overflow > 0 and row_slots:
+                row_slots[-1].overflow_count = overflow
+            
+            # Pad to full row width with empty slots
+            while len(row_slots) < columns:
+                row_slots.append(BinderSlot(position=0, is_empty=True))
+            
+            slots.extend(row_slots)
         
-        # Calculate total pages based on expanded slots
-        total_expanded = len(all_expanded_slots)
-        total_pages = max(1, (total_expanded + slots_per_page - 1) // slots_per_page)
-        
-        # Get slots for this page
-        start_idx = (page - 1) * slots_per_page
-        end_idx = start_idx + slots_per_page
-        slots = all_expanded_slots[start_idx:end_idx]
-        
-        # Pad with empty slots if needed
+        # Pad remaining rows if page has fewer card names than rows
         while len(slots) < slots_per_page:
             slots.append(BinderSlot(position=0, is_empty=True))
     else:
