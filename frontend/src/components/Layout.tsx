@@ -23,6 +23,7 @@ import {
   SwapVert as BulkIcon,
   ListAlt as ListIcon,
   AttachMoney as MoneyIcon,
+  ContentCopy as DuplicatesIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,6 +41,7 @@ const menuItems = [
   { text: 'Manage Containers', icon: <FolderIcon />, path: '/containers' },
   { text: 'Collection Entries', icon: <ListIcon />, path: '/collection-entries' },
   { text: 'Collection Value', icon: <MoneyIcon />, path: '/value' },
+  { text: 'Find Duplicates', icon: <DuplicatesIcon />, path: '/duplicates' },
   { text: 'Import / Export', icon: <BulkIcon />, path: '/bulk' },
 ];
 

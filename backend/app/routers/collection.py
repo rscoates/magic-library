@@ -13,7 +13,9 @@ from app.models.user import User
 from app.models.set import Set
 from app.schemas.collection import (
     CollectionEntryCreate, CollectionEntryUpdate, CollectionEntryResponse,
-    CollectionSummary, CollectionLocation, CollectionMoveRequest, CollectionMoveResponse
+    CollectionSummary, CollectionLocation, CollectionMoveRequest, CollectionMoveResponse,
+    DuplicateCardLocation, DuplicateCard, DuplicatesResponse,
+    ConsolidateRequest, ConsolidateResponse,
 )
 from app.auth import get_current_user
 
@@ -477,6 +479,203 @@ def move_collection_entry(
         target_quantity=target_entry.quantity,
         target_container_name=target_container.name,
         target_container_path=get_container_path(target_container, db)
+    )
+
+
+# ---- Duplicate Detection ----
+
+@router.get("/duplicates", response_model=DuplicatesResponse)
+def find_duplicates(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Find cards that appear in more than one non-deck container (box or file).
+    Returns each card name with its locations, quantities, and entry IDs.
+    """
+    # Get the deck container type ID to exclude
+    deck_type = db.query(ContainerType).filter(
+        func.lower(ContainerType.name) == "deck"
+    ).first()
+    deck_type_id = deck_type.id if deck_type else -1
+
+    # Get sold container IDs to exclude
+    sold_container_ids = {
+        c[0] for c in db.query(Container.id).filter(
+            Container.user_id == user.id,
+            Container.is_sold == True
+        ).all()
+    }
+
+    # Get all non-deck, non-sold container IDs for this user
+    valid_containers = db.query(Container).filter(
+        Container.user_id == user.id,
+        Container.type_id != deck_type_id,
+        Container.is_sold == False,
+    ).all()
+    valid_container_ids = {c.id for c in valid_containers}
+    container_map = {c.id: c for c in valid_containers}
+
+    if not valid_container_ids:
+        return DuplicatesResponse(duplicates=[], total_duplicate_cards=0)
+
+    # Find card names that appear in 2+ distinct valid containers
+    # Join collection entries with cards to group by card name
+    entries = (
+        db.query(CollectionEntry)
+        .filter(
+            CollectionEntry.user_id == user.id,
+            CollectionEntry.container_id.in_(valid_container_ids),
+        )
+        .all()
+    )
+
+    # Group entries by card name
+    from collections import defaultdict
+    card_name_entries: dict[str, list] = defaultdict(list)
+    card_name_cache: dict[tuple, str] = {}
+
+    for entry in entries:
+        key = (entry.set_code, entry.card_number)
+        if key not in card_name_cache:
+            card = db.query(Card).filter(
+                Card.set_code == entry.set_code,
+                Card.number == entry.card_number
+            ).first()
+            card_name_cache[key] = card.name if card else "Unknown"
+        card_name_entries[card_name_cache[key]].append(entry)
+
+    # Filter to names appearing in 2+ distinct containers
+    duplicates = []
+    for card_name, card_entries in sorted(card_name_entries.items()):
+        distinct_containers = {e.container_id for e in card_entries}
+        if len(distinct_containers) < 2:
+            continue
+
+        locations = []
+        total_qty = 0
+        for entry in card_entries:
+            container = container_map.get(entry.container_id)
+            language = db.query(Language).filter(Language.id == entry.language_id).first()
+            finish = db.query(Finish).filter(Finish.id == entry.finish_id).first() if entry.finish_id else None
+
+            locations.append(DuplicateCardLocation(
+                entry_id=entry.id,
+                container_id=entry.container_id,
+                container_name=container.name if container else "Unknown",
+                container_path=get_container_path(container, db) if container else "Unknown",
+                set_code=entry.set_code,
+                card_number=entry.card_number,
+                quantity=entry.quantity,
+                finish_name=finish.name if finish else None,
+                language_name=language.name if language else "Unknown",
+            ))
+            total_qty += entry.quantity
+
+        duplicates.append(DuplicateCard(
+            card_name=card_name,
+            total_quantity=total_qty,
+            container_count=len(distinct_containers),
+            locations=locations,
+        ))
+
+    # Sort by number of containers descending, then name
+    duplicates.sort(key=lambda d: (-d.container_count, d.card_name))
+
+    return DuplicatesResponse(
+        duplicates=duplicates,
+        total_duplicate_cards=len(duplicates),
+    )
+
+
+@router.post("/consolidate", response_model=ConsolidateResponse)
+def consolidate_card(
+    data: ConsolidateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Consolidate all copies of a card (by name) from multiple containers into a
+    single target container. Moves entries from non-deck, non-sold containers only.
+    """
+    # Verify target container belongs to user
+    target_container = db.query(Container).filter(
+        Container.id == data.target_container_id,
+        Container.user_id == user.id,
+    ).first()
+    if not target_container:
+        raise HTTPException(status_code=404, detail="Target container not found")
+
+    # Get the deck container type ID to exclude
+    deck_type = db.query(ContainerType).filter(
+        func.lower(ContainerType.name) == "deck"
+    ).first()
+    deck_type_id = deck_type.id if deck_type else -1
+
+    # Get valid (non-deck, non-sold) container IDs
+    valid_container_ids = {
+        c[0] for c in db.query(Container.id).filter(
+            Container.user_id == user.id,
+            Container.type_id != deck_type_id,
+            Container.is_sold == False,
+        ).all()
+    }
+
+    # Find all collection entries matching the given card name in valid containers
+    # (excluding the target container itself)
+    source_entries = (
+        db.query(CollectionEntry)
+        .join(Card, (Card.set_code == CollectionEntry.set_code) & (Card.number == CollectionEntry.card_number))
+        .filter(
+            CollectionEntry.user_id == user.id,
+            CollectionEntry.container_id.in_(valid_container_ids),
+            CollectionEntry.container_id != data.target_container_id,
+            Card.name == data.card_name,
+        )
+        .all()
+    )
+
+    if not source_entries:
+        raise HTTPException(status_code=404, detail="No entries found to consolidate")
+
+    moved_count = 0
+    for source in source_entries:
+        # Check if matching entry exists in target
+        existing_target = db.query(CollectionEntry).filter(
+            CollectionEntry.set_code == source.set_code,
+            CollectionEntry.card_number == source.card_number,
+            CollectionEntry.container_id == data.target_container_id,
+            CollectionEntry.finish_id == source.finish_id,
+            CollectionEntry.language_id == source.language_id,
+            CollectionEntry.user_id == user.id,
+        ).first()
+
+        if existing_target:
+            existing_target.quantity += source.quantity
+        else:
+            new_entry = CollectionEntry(
+                set_code=source.set_code,
+                card_number=source.card_number,
+                container_id=data.target_container_id,
+                quantity=source.quantity,
+                finish_id=source.finish_id,
+                language_id=source.language_id,
+                comments=source.comments,
+                user_id=user.id,
+            )
+            db.add(new_entry)
+
+        moved_count += source.quantity
+        db.delete(source)
+
+    db.commit()
+
+    return ConsolidateResponse(
+        success=True,
+        message=f"Consolidated {moved_count} copy/copies of '{data.card_name}' into {target_container.name}",
+        moved_count=moved_count,
+        target_container_name=target_container.name,
+        target_container_path=get_container_path(target_container, db),
     )
 
 

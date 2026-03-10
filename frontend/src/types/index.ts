@@ -281,3 +281,41 @@ export interface DeckViewResponse {
   total_cards: number;
   categories: DeckViewCategory[];
 }
+
+// Duplicate detection types
+export interface DuplicateCardLocation {
+  entry_id: number;
+  container_id: number;
+  container_name: string;
+  container_path: string;
+  set_code: string;
+  card_number: string;
+  quantity: number;
+  finish_name: string | null;
+  language_name: string;
+}
+
+export interface DuplicateCard {
+  card_name: string;
+  total_quantity: number;
+  container_count: number;
+  locations: DuplicateCardLocation[];
+}
+
+export interface DuplicatesResponse {
+  duplicates: DuplicateCard[];
+  total_duplicate_cards: number;
+}
+
+export interface ConsolidateRequest {
+  card_name: string;
+  target_container_id: number;
+}
+
+export interface ConsolidateResponse {
+  success: boolean;
+  message: string;
+  moved_count: number;
+  target_container_name: string;
+  target_container_path: string;
+}

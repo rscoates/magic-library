@@ -89,3 +89,42 @@ class CollectionSummary(BaseModel):
     rarity: str
     total_quantity: int
     locations: List[CollectionLocation]
+
+
+# ---- Duplicate Detection ----
+
+class DuplicateCardLocation(BaseModel):
+    entry_id: int
+    container_id: int
+    container_name: str
+    container_path: str
+    set_code: str
+    card_number: str
+    quantity: int
+    finish_name: Optional[str] = None
+    language_name: str
+
+
+class DuplicateCard(BaseModel):
+    card_name: str
+    total_quantity: int
+    container_count: int
+    locations: List[DuplicateCardLocation]
+
+
+class DuplicatesResponse(BaseModel):
+    duplicates: List[DuplicateCard]
+    total_duplicate_cards: int
+
+
+class ConsolidateRequest(BaseModel):
+    card_name: str
+    target_container_id: int
+
+
+class ConsolidateResponse(BaseModel):
+    success: bool
+    message: str
+    moved_count: int
+    target_container_name: str
+    target_container_path: str

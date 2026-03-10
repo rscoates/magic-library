@@ -9,6 +9,7 @@ import BulkImportExport from './pages/BulkImportExport';
 import Login from './pages/Login';
 import CollectionEntries from './pages/CollectionEntries';
 import CollectionValue from './pages/CollectionValue';
+import FindDuplicates from './pages/FindDuplicates';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
         <Route path="/containers" element={<ManageContainers />} />
         <Route path="/collection-entries" element={<CollectionEntries />} />
         <Route path="/value" element={<CollectionValue />} />
+        <Route path="/duplicates" element={<FindDuplicates />} />
         <Route path="/bulk" element={<BulkImportExport />} />
       </Routes>
     </Layout>

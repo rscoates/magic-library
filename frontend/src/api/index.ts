@@ -14,6 +14,8 @@ import type {
   AuthStatus,
   TopCardsResponse,
   PricingStatusResponse,
+  DuplicatesResponse,
+  ConsolidateResponse,
 } from '../types';
 
 // Auth
@@ -138,6 +140,19 @@ export const collectionApi = {
   move: async (entryId: number, quantity: number, targetContainerId: number): Promise<import('../types').MoveResponse> => {
     const { data } = await api.post(`/collection/${entryId}/move`, {
       quantity,
+      target_container_id: targetContainerId,
+    });
+    return data;
+  },
+
+  getDuplicates: async (): Promise<DuplicatesResponse> => {
+    const { data } = await api.get('/collection/duplicates');
+    return data;
+  },
+
+  consolidate: async (cardName: string, targetContainerId: number): Promise<ConsolidateResponse> => {
+    const { data } = await api.post('/collection/consolidate', {
+      card_name: cardName,
       target_container_id: targetContainerId,
     });
     return data;
